@@ -47,7 +47,8 @@
 respectively.'")
 
 (defvar company-makefile--dir nil)
-(setq company-makefile--dir (file-name-directory load-file-name))
+(when load-file-name
+  (setq company-makefile--dir (file-name-directory load-file-name)))
 
 ;; ------------------------------------------------------------
 ;;* Completion candidates
