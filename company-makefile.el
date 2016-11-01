@@ -46,7 +46,7 @@
 `makefile-need-macro-pickup' and `makefile-need-target-pickup' after ':' and '='
 respectively.'")
 
-(defvar company-makefile--dir nil)
+(defvar company-makefile--dir)
 (when load-file-name
   (setq company-makefile--dir (file-name-directory load-file-name)))
 
@@ -89,23 +89,23 @@ respectively.'")
 
 ;; implicit variables
 (defvar company-makefile--implicit
-  (eval-when-compile
-    (cl-loop for (k . arr) in (with-temp-buffer
-                                (insert-file-contents
-                                 (expand-file-name "build/impvars.dat"
-                                                   company-makefile--dir))
-                                (car (read-from-string
-                                      (buffer-substring-no-properties (point-min)
-                                                                      (point-max)))))
-       do (add-text-properties
-           0 1
-           (list
-            'annot "Implicit Variable"
-            'meta (aref arr 0)
-            'index (aref arr 1)
-            'uri :implicit)
-           k)
-       collect k)))
+  (cl-loop for (k . arr) in
+       (with-temp-buffer
+         (insert-file-contents
+          (expand-file-name "build/impvars.dat"
+                            company-makefile--dir))
+         (car (read-from-string
+               (buffer-substring-no-properties (point-min)
+                                               (point-max)))))
+     do (add-text-properties
+         0 1
+         (list
+          'annot "Implicit Variable"
+          'meta (aref arr 0)
+          'index (aref arr 1)
+          'uri :implicit)
+         k)
+     collect k))
 
 ;; gmake statements (ifdef, etc)
 ;; #<marker at makefile-gmake-statemts in make-mode.el>
