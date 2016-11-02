@@ -171,7 +171,7 @@ respectively.'")
 (defun company-makefile--target-p ()
   (save-excursion
     (goto-char (line-beginning-position))
-    (looking-at-p "[^ \t\n]*:")))
+    (looking-at-p "^[^ \t\n]*:")))
 
 ;; symbol at point to complete on
 (defun company-makefile-batp ()
