@@ -158,7 +158,7 @@ respectively.'")
 
 ;; open help docs in browser if uri is available
 (defun company-makefile--location (candidate)
-  (when-let ((uri (get-text-property 0 'uri candidate)))
+  (when-let* ((uri (get-text-property 0 'uri candidate)))
     (browse-url (or (and (eq uri :implicit)
                          (concat (cdr (assq uri company-makefile--uris)) "#"
                                  (get-text-property 0 'index candidate)))
@@ -189,7 +189,7 @@ respectively.'")
 ;;* completion-at-point
 
 (defun company-makefile-capf ()
-  (if-let ((bnds (bounds-of-thing-at-point 'makesym)))
+  (if-let* ((bnds (bounds-of-thing-at-point 'makesym)))
       (cond
        ;; don't try to complete on possible file names, let company-files do it
        ((eq (char-before (car bnds)) ?/) nil)
@@ -209,6 +209,11 @@ respectively.'")
               :annotation-function 'company-makefile--annotation
               :company-location 'company-makefile--location
               :company-docsig 'company-makefile--meta))
+       ;; local variables ${...}
+       ((and (eq (char-before (car bnds)) ?{)
+             (eq (char-before (1- (car bnds))) ?$))
+        (list (car bnds) (cdr bnds)
+              `(,@(company-makefile--dyn-vars))))
        ;; targets
        ((company-makefile--target-p)
         (list (car bnds) (cdr bnds)
