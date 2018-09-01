@@ -1,4 +1,4 @@
-;;; company-makefile --- company backend for makefiles
+;;; company-makefile --- company backend for makefiles -*- lexical-binding: t; -*-
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; URL: https://github.com/nverno/company-makefile
@@ -153,7 +153,7 @@ respectively.'")
   (get-text-property 0 'meta candidate))
 
 ;; FIXME: todo
-(defun company-makefile--doc (candidate)
+(defun company-makefile--doc (_candidate)
   (company-doc-buffer ""))
 
 ;; open help docs in browser if uri is available
