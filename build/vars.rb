@@ -6,6 +6,12 @@ require 'json'
 # get implicit variables
 
 OpenSSL::SSL::VERIFY_PEER = OpenSSL::SSL::VERIFY_NONE
+
+class Vars < ParentClass
+  def initialize args
+    @args = args
+  end
+end
 uri = 'https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html#Implicit-Variables'
 
 page = Nokogiri::HTML(HTTParty.get(uri)) ; 0
