@@ -253,27 +253,5 @@ respectively.'")
 ;;;###autoload
 (add-hook 'makefile-mode-hook 'company-makefile-init)
 
-;; (defun company-makefile--prefix ()
-;;   (and (memq major-mode company-makefile-modes)
-;;        (not (company-in-string-or-comment))
-;;        (company-grab-symbol)))
-
-;; (defun company-makefile--candidates (arg)
-;;   (all-completions arg company-makefile--completions))
-
-;; ;;;###autoload
-;; (defun company-makefile (command &optional arg &rest _args)
-;;   "`company-mode' backend for makefiles."
-;;   (interactive (list 'interactive))
-;;   (cl-case command
-;;     (interactive (company-begin-backend 'company-makefile))
-;;     (prefix (company-makefile--prefix))
-;;     (candidates (company-makefile--candidates arg))
-;;     (annotation (company-makefile--annotation arg))
-;;     (doc-buffer (company-makefile--doc arg))
-;;     (meta (company-makefile--meta arg))
-;;     (location (company-makefile--location arg))
-;;     (require-match 'never)))
-
 (provide 'company-makefile)
 ;;; company-makefile.el ends here
