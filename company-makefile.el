@@ -64,23 +64,27 @@ respectively.'")
 ;; uris for help docs
 (defvar company-makefile--uris
   '((:auto
-     . "https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html")
+     . "https://www.gnu.org/software/make/manual/html_node/\
+Automatic-Variables.html")
     (:fun
      . "https://www.gnu.org/software/make/manual/html_node/Functions.html")
     (:implicit
-     . "https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html")))
+     . "https://www.gnu.org/software/make/manual/html_node/\
+Implicit-Variables.html")))
 
 ;; automatic variables with meta blurb
 (defvar company-makefile--autovars
   (eval-when-compile
     (let ((av '(("@" . "Target name")
-                ("%" . "Target member name, eg. target=foo.a(bar.o), then '$%'=bar.o and '$@'=foo.a")
+                ("%" . "Target member name, eg. target=foo.a(bar.o), \
+then '$%'=bar.o and '$@'=foo.a")
                 ("<" . "Name of first prerequisite")
                 ("?" . "Names of all prerequisites newer than target")
                 ("^" . "Names of all prerequisites (no duplicates)")
                 ("+" . "Like '^', but with duplicates")
                 ("|" . "Names of all order-only prerequisites")
-                ("*" . "Stem of implicit rule, eg. target=dir/a.foo.a, pattern=a.%.b, then dir/a"))))
+                ("*" . "Stem of implicit rule, eg. target=dir/a.foo.a, \
+pattern=a.%.b, then dir/a"))))
       (cl-loop for (v . meta) in av
          do (setq v (concat "$" v))
            (add-text-properties
@@ -112,19 +116,19 @@ respectively.'")
 (defvar company-makefile--keywords
   (eval-when-compile
     (cl-loop for v in makefile-gmake-statements
-      do (add-text-properties
-          0 1 (list 'annot "Keyword <Gmake>" 'meta "") v)
-      collect v)))
+       do (add-text-properties
+           0 1 (list 'annot "Keyword <Gmake>" 'meta "") v)
+       collect v)))
 
 ;; gmake functions
 ;; #<marker at makefile-gnumake-functions-alist in make-mode.el>
 (defvar company-makefile--functions
   (eval-when-compile
     (cl-loop for v in `(,@makefile-gnumake-functions-alist
-                       ("abspath") ("realpath"))
-      do (add-text-properties
-          0 1 (list 'annot "Function <Gmake>" 'meta "" 'uri :fun) (car v))
-      collect (car v))))
+                        ("abspath") ("realpath"))
+       do (add-text-properties
+           0 1 (list 'annot "Function <Gmake>" 'meta "" 'uri :fun) (car v))
+       collect (car v))))
 
 ;; dynamic completions
 (defun company-makefile--dyn-vars ()
