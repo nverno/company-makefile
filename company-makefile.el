@@ -2,6 +2,7 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
+;; Last modified: <2019-01-14 11:13:52 noah>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
@@ -47,16 +48,26 @@
   :group 'convenience
   :group 'matching)
 
-(defcustom company-makefile-modes '(makefile-gmake-mode)
+(defcustom company-makefile-modes '(makefile-gmake-mode makefile-mode)
   "Modes where `company-makefile' should be active."
-  :type '(repeat :inline t (symbol :tag "mode")))
+  :type '(repeat :inline t (symbol :tag "mode"))
+  :group 'company-makefile)
 
 (defcustom company-makefile-dynamic-complete t
   "Offer dynamic completions for macros/targets. Invalidates 
 `makefile-need-macro-pickup' and `makefile-need-target-pickup' after ':' and '='
 respectively.'"
-  :type '(choice (const :tag "off" nil)
-                 (const :tag "on" t)))
+  :type 'boolean
+  :group 'company-makefile)
+
+(eval-and-compile
+  (defconst company-makefile-dir
+    (file-name-directory
+     (cond
+      (load-in-progress load-file-name)
+      ((and (boundp 'byte-compile-current-file) byte-compile-current-file)
+       byte-compile-current-file)
+      (:else (buffer-file-name))))))
 
 ;; ------------------------------------------------------------
 ;;* Completion candidates
@@ -80,46 +91,38 @@ respectively.'"
     (:keyword . nil)
     (:dynamic . nil)))
 
-(eval-and-compile
-  (defconst company-makefile-dir
-    (file-name-directory
-     (cond
-      (load-in-progress load-file-name)
-      ((and (boundp 'byte-compile-current-file) byte-compile-current-file)
-       byte-compile-current-file)
-      (:else (buffer-file-name))))))
-
 (defvar company-makefile-data
   (with-temp-buffer
     (insert-file-contents
      (expand-file-name "company-makefile-data.el" company-makefile-dir))
-    (car (read-from-string (buffer-string)))))
+    (car (read-from-string (buffer-string))))
+  "Info for makefile implicits/builtins.")
 
-;; dynamic completions
-(defvar-local company-makefile--dyn-vars ())
-(defun company-makefile--dyn-vars ()
-  (when company-makefile-dynamic-complete
-    (if (and (not makefile-need-macro-pickup)
-             company-makefile--dyn-vars)
-        company-makefile--dyn-vars
-      ;; need to pickup new vars
-      (makefile-pickup-macros)
-      (setq company-makefile--dyn-vars
-            (cl-loop for v in (mapcar 'car makefile-macro-table)
-               do (add-text-properties 0 1 (list 'annot "Local Variable") v)
-               collect v)))))
+;; Dynamic completions
+(defmacro company-makefile--dyn-fn (type props)
+  "Create dynamic completion function/cache for given TYPE, adding PROPS to \
+each variable.
+TYPE should be one of [macro|target] to align with `make-mode' variables."
+  (declare (indent 1))
+  (let ((name (intern (concat "company-makefile--dyn-" type)))
+        (need-pickup (intern (concat "makefile-need-" type "-pickup")))
+        (pickup (intern (concat "makefile-pickup-" type "s")))
+        (table (intern (concat "makefile-" type "-table"))))
+    `(progn
+       (defvar-local ,name ())           ;cache
+       (defun ,name ()
+         (when company-makefile-dynamic-complete
+           (if (and (not ,need-pickup) ,name)
+               ,name
+             ;; pickup new vars
+             (,pickup)
+             (setq ,name
+                   (cl-loop for v in (mapcar 'car ,table)
+                      do (add-text-properties 0 1 ,props v)
+                      collect v))))))))
 
-(defvar-local company-makefile--dyn-targets ())
-(defun company-makefile--dyn-targets ()
-  (when company-makefile-dynamic-complete
-    (if (and (not makefile-need-target-pickup)
-             company-makefile--dyn-targets)
-        company-makefile--dyn-targets
-      (makefile-pickup-targets)
-      (setq company-makefile--dyn-targets
-            (cl-loop for v in (mapcar 'car makefile-target-table)
-               do (add-text-properties 0 1 (list 'annot "Target") v)
-               collect v)))))
+(company-makefile--dyn-fn "macro" (list 'annot "<Local Var>"))
+(company-makefile--dyn-fn "target" (list 'annot "<Target>"))
 
 ;; ------------------------------------------------------------
 ;;* Candidate Adornments
@@ -184,7 +187,7 @@ respectively.'"
               `(,@(assq 'function company-makefile-data)
                 ,@(assq 'implicit company-makefile-data)
                 ,@(assq 'autovar company-makefile-data)
-                ,@(company-makefile--dyn-vars))
+                ,@(company-makefile--dyn-macro))
               :annotation-function 'company-makefile--annotation
               :company-location 'company-makefile--location
               :company-docsig 'company-makefile--meta))
@@ -192,13 +195,13 @@ respectively.'"
        ((and (eq (char-before (car bnds)) ?{)
              (eq (char-before (1- (car bnds))) ?$))
         (list (car bnds) (cdr bnds)
-              `(,@(company-makefile--dyn-vars)
+              `(,@(company-makefile--dyn-macro)
                 ,@(assq 'implicit company-makefile-data)
                 ,@(assq 'autovar company-makefile-data))))
        ;; targets
        ((company-makefile--target-p)
         (list (car bnds) (cdr bnds)
-              (company-makefile--dyn-targets)
+              (company-makefile--dyn-target)
               :annotation-function 'company-makefile--annotation))
        ;; keywords
        (t
