@@ -63,7 +63,7 @@ respectively.'"
                                                    (&optional name meta default
                                                               annot index type))
                                      (:copier nil))
-  (name nil :read-only t) (meta "") (default "") (annot "") index type)
+  (name nil :read-only t) (meta "") (default "") (annot "") (index "") type)
 
 ;; ------------------------------------------------------------
 ;;* Completion candidates

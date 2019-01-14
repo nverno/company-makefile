@@ -56,7 +56,7 @@ target.")
                         ("?F" . "List of basenames of all prereqs newer than \
 target.")))
 
-(cl-defun make-vars-create (name &key meta default annot index type)
+(cl-defun make-vars-create (name &key (meta "") (default "") annot (index "") type)
   "Create makefile variable."
   (company-makefile-vars--create name meta default annot index type))
 
@@ -117,3 +117,12 @@ target.")))
       (prin1 ht (current-buffer))
       (write-region (point-min) (point-max) outfile))
     ht))
+
+(defun make-vars-add-props (table)
+  "Add text properties to keys in hash-TABLE."
+  (cl-loop for k being the hash-keys of table using (hash-values v)
+     do (add-text-properties
+         0 1 (list 'annot (company-makefile-vars-annot v)
+                   'meta (company-makefile-vars-meta v)
+                   'type (company-makefile-vars-type v)
+                   'index (company-makefile-vars-index v)))))
