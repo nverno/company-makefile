@@ -2,7 +2,7 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
-;; Last modified: <2019-01-14 11:13:52 noah>
+;; Last modified: <2019-01-14 15:02:15>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
