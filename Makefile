@@ -3,7 +3,7 @@ wget  ?= wget
 ruby  ?= ruby
 
 .PHONY: test help all
-all: help
+all: help 
 
 test:  ## Run tests
 	$(emacs) -Q -batch -L . -l ert -l test/company-makefile-tests.el \
@@ -18,14 +18,15 @@ el2markdown.el:  ## Download el2markdown.el converter
 	$(wget) -q -O $@                                                 \
 	"https://github.com/Lindydancer/el2markdown/raw/master/el2markdown.el"
 
-impvars.el: build/impvars.json  ## Get implicit variable info
-	$(emacs) -batch -l build/vars.el -f batch-convert $<
+company-makefile-data.el: build/impvars.json build/defaults.el  ## Generate completion data
+	$(emacs) -batch -L . -l build/build.el -f batch-create-data $^
 
-defaults.el: build/defaults ## Get default make values from local make
+.INTERMEDIATE: build/defaults.el
+build/defaults.el: build/defaults ## Get default make values from local make
 	@(cd build && ./$(<F))
 
 .INTERMEDIATE: build/impvars.json
-build/impvars.json: build/vars.rb build/vars.el ## Implicit variable info to JSON
+build/impvars.json: build/vars.rb build/build.el ## Implicit variable info to JSON
 	$(ruby) build/vars.rb
 
 help:  ## Show help

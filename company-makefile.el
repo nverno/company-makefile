@@ -40,6 +40,7 @@
 (require 'company nil t)
 (defvar company-require-match)
 (defvar company-backends)
+(declare-function company-doc-buffer "company")
 
 (defgroup company-makefile nil
   "Completion backend for gnu makefiles."
@@ -57,14 +58,6 @@ respectively.'"
   :type '(choice (const :tag "off" nil)
                  (const :tag "on" t)))
 
-;; structure to store variable info - used in build
-(cl-defstruct (company-makefile-vars (:constructor nil)
-                                     (:constructor company-makefile-vars--create
-                                                   (&optional name meta default
-                                                              annot index type))
-                                     (:copier nil))
-  (name nil :read-only t) (meta "") (default "") (annot "") (index "") type)
-
 ;; ------------------------------------------------------------
 ;;* Completion candidates
 ;;
@@ -78,7 +71,7 @@ respectively.'"
 
 ;; uris for help docs
 (defvar company-makefile--uris
-  '((:var
+  '((:autovar
      . "https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html")
     (:function
      . "https://www.gnu.org/software/make/manual/html_node/Functions.html")
@@ -87,68 +80,37 @@ respectively.'"
     (:keyword . nil)
     (:dynamic . nil)))
 
-;; automatic variables with meta blurb
-(defvar company-makefile--autovars
-  (eval-when-compile
-    (let ((av ))
-      (cl-loop for (v . meta) in av
-         do (setq v (concat "$" v))
-           (add-text-properties
-            0 1 (list 'annot "Auto Variable <Gmake>" 'meta meta 'uri :auto) v)
-         collect v))))
-
-;; implicit variables
-(defvar company-makefile--implicit
-  (cl-loop for (k . arr) in
-       (with-temp-buffer
-         (insert-file-contents company-makefile--vars)
-         (car (read-from-string (buffer-substring-no-properties (point-min)
-                                                                (point-max)))))
-     do (add-text-properties
-         0 1
-         (list
-          'annot "Implicit Variable"
-          'meta (aref arr 0)
-          'index (aref arr 1)
-          'uri :implicit)
-         k)
-     collect k))
-
-;; gmake statements (ifdef, etc)
-;; #<marker at makefile-gmake-statemts in make-mode.el>
-(defvar company-makefile--keywords
-  (eval-when-compile
-    (cl-loop for v in makefile-gmake-statements
-       do (add-text-properties
-           0 1 (list 'annot "Keyword <Gmake>" 'meta "") v)
-       collect v)))
-
-;; gmake functions
-;; #<marker at makefile-gnumake-functions-alist in make-mode.el>
-(defvar company-makefile--functions
-  (eval-when-compile
-    (cl-loop for v in `(,@makefile-gnumake-functions-alist
-                        ("abspath") ("realpath"))
-       do (add-text-properties
-           0 1 (list 'annot "Function <Gmake>" 'meta "" 'uri :fun) (car v))
-       collect (car v))))
+(defvar company-makefile-data
+  (when load-file-name
+    (with-temp-buffer
+      (insert-file-contents "company-makefile-data.el")
+      (car (read-from-string (buffer-string))))))
 
 ;; dynamic completions
+(defvar-local company-makefile--dyn-vars ())
 (defun company-makefile--dyn-vars ()
   (when company-makefile-dynamic-complete
-    (and makefile-need-macro-pickup
-         (makefile-pickup-macros))
-    (cl-loop for v in (mapcar 'car makefile-macro-table)
-       do (add-text-properties 0 1 (list 'annot "Local Variable") v)
-       collect v)))
+    (if (and (not makefile-need-macro-pickup)
+             company-makefile--dyn-vars)
+        company-makefile--dyn-vars
+      ;; need to pickup new vars
+      (makefile-pickup-macros)
+      (setq company-makefile--dyn-vars
+            (cl-loop for v in (mapcar 'car makefile-macro-table)
+               do (add-text-properties 0 1 (list 'annot "Local Variable") v)
+               collect v)))))
 
+(defvar-local company-makefile--dyn-targets ())
 (defun company-makefile--dyn-targets ()
   (when company-makefile-dynamic-complete
-    (and makefile-need-target-pickup
-         (makefile-pickup-targets))
-    (cl-loop for v in (mapcar 'car makefile-target-table)
-       do (add-text-properties 0 1 (list 'annot "Target") v)
-       collect v)))
+    (if (and (not makefile-need-target-pickup)
+             company-makefile--dyn-targets)
+        company-makefile--dyn-targets
+      (makefile-pickup-targets)
+      (setq company-makefile--dyn-targets
+            (cl-loop for v in (mapcar 'car makefile-target-table)
+               do (add-text-properties 0 1 (list 'annot "Target") v)
+               collect v)))))
 
 ;; ------------------------------------------------------------
 ;;* Candidate Adornments
@@ -165,11 +127,11 @@ respectively.'"
 
 ;; open help docs in browser if uri is available
 (defun company-makefile--location (candidate)
-  (when-let* ((uri (get-text-property 0 'uri candidate)))
-    (browse-url (or (and (eq uri :implicit)
-                         (concat (cdr (assq uri company-makefile--uris)) "#"
+  (when-let* ((type (get-text-property 0 'type candidate)))
+    (browse-url (or (and (eq type :implicit)
+                         (concat (cdr (assq type company-makefile--uris)) "#"
                                  (get-text-property 0 'index candidate)))
-                    (cdr (assq uri company-makefile--uris))))))
+                    (cdr (assq type company-makefile--uris))))))
 
 ;; ------------------------------------------------------------
 ;;* Helpers
@@ -202,25 +164,28 @@ respectively.'"
        ((eq (char-before (car bnds)) ?/) nil)
        ;; point or symbol prefixed by $, company-makefile--autovars
        ((eq (char-before (car bnds)) ?$)
-        (list (1- (car bnds)) (cdr bnds) company-makefile--autovars
+        (list (car bnds) (cdr bnds) (assq 'autovar company-makefile-data)
               :annotation-function 'company-makefile--annotation
               :company-location 'company-makefile--location
               :company-docsig 'company-makefile--meta))
-       ;; function / local variable / implicit vars
+       ;; function / local variable / implicit vars / autovars
        ((and (eq (char-before (car bnds)) ?\()
              (eq (char-before (1- (car bnds))) ?$))
         (list (car bnds) (cdr bnds)
-              `(,@company-makefile--functions
-                ,@(company-makefile--dyn-vars)
-                ,@company-makefile--implicit)
+              `(,@(assq 'function company-makefile-data)
+                ,@(assq 'implicit company-makefile-data)
+                ,@(assq 'autovar company-makefile-data)
+                ,@(company-makefile--dyn-vars))
               :annotation-function 'company-makefile--annotation
               :company-location 'company-makefile--location
               :company-docsig 'company-makefile--meta))
-       ;; local variables ${...}
+       ;; ${...} - local / auto / implicit vars
        ((and (eq (char-before (car bnds)) ?{)
              (eq (char-before (1- (car bnds))) ?$))
         (list (car bnds) (cdr bnds)
-              `(,@(company-makefile--dyn-vars))))
+              `(,@(company-makefile--dyn-vars)
+                ,@(assq 'implicit company-makefile-data)
+                ,@(assq 'autovar company-makefile-data))))
        ;; targets
        ((company-makefile--target-p)
         (list (car bnds) (cdr bnds)
@@ -228,7 +193,7 @@ respectively.'"
               :annotation-function 'company-makefile--annotation))
        ;; keywords
        (t
-        (list (car bnds) (cdr bnds) company-makefile--keywords
+        (list (car bnds) (cdr bnds) (assq 'keyword company-makefile-data)
               :annotation-function 'company-makefile--annotation)))))
 
 ;;;###autoload

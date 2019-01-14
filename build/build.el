@@ -1,33 +1,39 @@
 (require 'json)
 (require 'cl-lib)
-(require 'company-makefile)
+(require 'make-mode)
 
-(defun batch-convert ()
-  "Batch convert JSON to alist."
+(defconst make-vars-data-file "company-makefile-data.el"
+  "File in which to store data.")
+
+(defun batch-create-data ()
+  "Gather info from local 'make -p' and web, and dump to file."
   (defvar command-line-args-left)
-  (let ((error nil))
+  (let ((error nil) impvars defaults)
     (while command-line-args-left
-      (let* ((infile (car command-line-args-left))
-             (outfile (concat (file-name-sans-extension infile) ".el")))
-        (message "%s -> %s" infile outfile)
-        (build-el-data infile outfile))
-      (setq command-line-args-left (cdr command-line-args-left)))))
-
-(defun build-el-data (in out)
-  (save-data (load-json-data in) (expand-file-name out)))
+      (let ((infile (car command-line-args-left)))
+       (pcase (file-name-extension infile)
+         (`"json" (setq impvars infile))
+         (`"el" (setq defaults infile))
+         (_ (message "Unknown file %s" infile))))
+      (setq command-line-args-left (cdr command-line-args-left)))
+    (if (and impvars defaults)
+        (merge-and-write-data :default-file defaults :impvar-file impvars
+                              :outfile make-vars-data-file)
+      (error "Failed to created data"))))
 
 (defun load-json-data (file)
+  "Read JSON data to alist."
   (let* ((json-key-type 'string))
     (json-read-file file)))
 
-(defun save-data (dat file)
+(defun make-vars-dump-data (data file)
+  "Dump resulting hash table to file."
   (with-temp-buffer
-    (let (print-level print-length)
-      (insert (pp-to-string dat))
-      (write-region (point-min) (point-max) file))))
+    (prin1 data (current-buffer))
+    (write-file file)))
 
 ;; -------------------------------------------------------------------
-;;; Merge info
+;;; Merge info, propertize keys, dump data
 
 ;; some short blurbs describing automatic variables
 (defvar make-autovars '(("@" . "Target name")
@@ -56,31 +62,46 @@ target.")
                         ("?F" . "List of basenames of all prereqs newer than \
 target.")))
 
-(cl-defun make-vars-create (name &key (meta "") (default "") annot (index "") type)
+;; structure to store variable info - used in build
+(cl-defstruct (company-makefile-vars (:constructor nil)
+                                     (:constructor company-makefile-vars--create
+                                                   (&optional name meta default
+                                                              annot index type))
+                                     (:copier nil))
+  (name nil :read-only t) meta default annot index type)
+
+(cl-defun make-vars-create (name &key meta (default "") annot index type)
   "Create makefile variable."
   (company-makefile-vars--create name meta default annot index type))
 
 (cl-defun merge-and-write-data (&key (default-file "defaults.el")
                                      (impvar-file "impvars.json")
                                      (outfile "company-makefile-data.el"))
-  "Merge data scrapped from web with local defaults and write to hash table."
+  "Merge data scrapped from web with local defaults and dump to file."
   (let* ((ht (make-hash-table :test 'equal))
          (defaults (with-temp-buffer
                      (insert-file-contents default-file)
                      (car (read-from-string (buffer-string)))))
          (imps (load-json-data impvar-file))
          (mappings '((default "<Implicit>" :implicit)
-                     (automatic "<Var>" :var)
-                     (makefile "<Dynamic>" :dynamic))))
+                     (automatic "<AutoVar>" :autovar)
+                     (makefile "<Dynamic>" :dynamic)))
+         (funcs (append (mapcar 'car makefile-gnumake-functions-alist)
+                        '("abspath" "realpath")))
+         (keywords makefile-gmake-statements)
+         autovars implicits dynamics)
 
     ;; Add local defaults to hash table
     (cl-loop for (type . rest) in defaults
        for annot = (cadr (assoc type mappings))
        for type = (caddr (assoc type mappings))
        do (cl-loop for (k . v) in rest
-             do (puthash k (make-vars-create k :default v :meta v :annot annot
-                                             :type type)
-                 ht)))
+             do (puthash k (make-vars-create
+                            k :default v
+                            :meta (if (eq type :dynamic) "Dynamic implicit variable"
+                                    v)
+                            :annot annot :type type)
+                         ht)))
     
     ;; add scraped descriptions
     (cl-loop for (k . arr) in imps
@@ -92,7 +113,8 @@ target.")))
                                              :annot "<Implicit>")
                          ht)
               ;; otherwise update data with longer descriptions
-              (setf (company-makefile-vars-meta val) (aref arr 0))
+              (setf (company-makefile-vars-meta val)
+                    (replace-regexp-in-string "\n" " " (aref arr 0)))
               (setf (company-makefile-vars-index val) (aref arr 1))
               (setf (company-makefile-vars-type val) :implicit))))
 
@@ -100,29 +122,54 @@ target.")))
     (cl-loop for (k . v) in make-autovars
        do (let ((val (gethash k ht)))
             (if (not val)
-                (puthash k (make-vars-create k :meta v :type :var :annot "<Var>") ht)
+                (puthash k (make-vars-create k :meta v :type :autovar
+                                             :annot "<AutoVar>")
+                         ht)
               (setf (company-makefile-vars-meta val) v))))
 
     ;; add gmake keywords (make-mode)
-    (cl-loop for v in makefile-gmake-statements
-       do (puthash v (make-vars-create v :annot "<Keyword>" :type :keyword) ht))
+    (cl-loop for v in keywords
+       do (set-text-properties 0 1 nil v)
+         (puthash v (make-vars-create v :annot "<Keyword>" :type :keyword
+                                      :meta "Builtin")
+                  ht))
 
     ;; add gmake functions (make-mode)
-    (cl-loop for v in (append makefile-gnumake-functions-alist
-                              '("abspath" "realpath"))
-       do (puthash v (make-vars-create v :annot "<Function>" :type :function) ht))
+    (cl-loop for v in funcs
+       do (set-text-properties 0 1 nil v)
+         (puthash v (make-vars-create v :annot "<Function>" :type :function
+                                      :meta "Builtin")
+                  ht))
 
+    ;; propertize hash keys
+    (make-vars-add-props ht)
+
+    ;; separate types
+    (maphash (lambda (k v)
+               (pcase (company-makefile-vars-type v)
+                 (:function (push k funcs))
+                 (:keyword (push k keywords))
+                 (:autovar (push k autovars))
+                 (:implicit (push k implicits))
+                 (:dynamic (push k dynamics))))
+             ht)
+    
     ;; store results
-    (with-temp-buffer
-      (prin1 ht (current-buffer))
-      (write-region (point-min) (point-max) outfile))
+    (make-vars-dump-data
+     (list (cons 'keyword keywords)
+           (cons 'function funcs)
+           (cons 'autovar autovars)
+           (cons 'implicit implicits)
+           (cons 'dynamic dynamics))
+     outfile)
     ht))
 
 (defun make-vars-add-props (table)
-  "Add text properties to keys in hash-TABLE."
+  "Add text properties to hash-TABLE keys."
   (cl-loop for k being the hash-keys of table using (hash-values v)
      do (add-text-properties
          0 1 (list 'annot (company-makefile-vars-annot v)
                    'meta (company-makefile-vars-meta v)
                    'type (company-makefile-vars-type v)
-                   'index (company-makefile-vars-index v)))))
+                   'index (company-makefile-vars-index v))
+         k)))
