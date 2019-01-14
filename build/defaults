@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Name of hash table to store defaults
+# HASH_TABLE=company-make--hash
+# Output types to match from `make -p`
+MAKE_TARGETS="default automatic makefile"
+# Output file
+OUTFILE=defaults.el
+
+##
+# @info         Get make default defines, output emacs alist
+# @param        Type of makefile target [default|automatic|makefile]
+# @return       alist: eg. default ("CC" . "cc") ...
+# @note         Run from directory w/o a Makefile
+##
+make_defaults() {
+    local target
+    target="${1:-default}"
+    make -pn 2>/dev/null |
+        awk 'BEGIN{ TARGET="'"$target"'"; REGEXP="^# *""'"$target"'"; FS="[:=]+";
+                    printf("(%s\n", TARGET); } {
+                if ($0 ~ REGEXP) {
+                   getline; 
+                   gsub(/[ \t]*$/, "", $1); # trim whitespace
+                   gsub(/^[ \t]/, "", $2);
+                   printf("  (\"%s\" . \"%s\")\n", $1, $2)
+                   # printf("(puthash \"%s\" \"%s\" %s)\n", $1, $2, HT)
+                }
+            } END { print ")"; }'
+}
+
+##
+# @info         Make alist of all defaults
+##
+make_all() {
+    (
+        echo -n "("
+        for t in $MAKE_TARGETS; do
+            echo -e "\e[36mMaking $t\e[0m" 1>&2
+            make_defaults "$t"
+        done
+        echo -n ")"
+    )>"$OUTFILE"
+    
+    # fix mafile variables
+    sed -i 's/(\("MAKEFLAGS".*\))/("MAKEFLAGS" . "")/' "$OUTFILE"
+    sed -i 's/(\("CURDIR".*\))/("CURDIR" . "")/' "$OUTFILE"
+}
+
+make_all

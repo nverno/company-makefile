@@ -1,10 +1,11 @@
-;;; company-makefile --- company backend for makefiles -*- lexical-binding: t; -*-
+;;; company-makefile.el --- company backend for makefiles -*- lexical-binding: t; -*-
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
+;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
-;; Copyright (C) 2016, Noah Peart, all rights reserved.
 ;; Created: 25 October 2016
+;; Version: 0.0.1
 
 ;; This file is not part of GNU Emacs.
 ;;
@@ -47,8 +48,11 @@
 respectively.'")
 
 (defvar company-makefile--dir)
+(defvar company-makefile--vars)
 (when load-file-name
-  (setq company-makefile--dir (file-name-directory load-file-name)))
+  (setq company-makefile--dir (file-name-directory load-file-name))
+  (setq company-makefile--vars
+        (expand-file-name "build/impvars.el" company-makefile--dir)))
 
 ;; ------------------------------------------------------------
 ;;* Completion candidates
@@ -84,7 +88,21 @@ then '$%'=bar.o and '$@'=foo.a")
                 ("+" . "Like '^', but with duplicates")
                 ("|" . "Names of all order-only prerequisites")
                 ("*" . "Stem of implicit rule, eg. target=dir/a.foo.a, \
-pattern=a.%.b, then dir/a"))))
+pattern=a.%.b, then dir/a")
+                ("(@D)" . "Directory part of file name of target with \
+trailing slash removed.")
+                ("(@F)" . "Basename of target - equivalent to $(notdir $@)")
+                ("(*D)" . "Directory part of stem.")
+                ("(*F)" . "Basename part of stem.")
+                ("(%D)" . "Directory part of target archive member name.")
+                ("(%F)" . "Basename part of target archive member name.")
+                ("(<D)" . "Directory part of first prerequiste.")
+                ("(<F)" . "Basename part of first prerequiste.")
+                ("(^D)" . "List of directory parts of all prereqs.")
+                ("(^F)" . "List of basenames of all prereqs.")
+                ("(?D)" . "List of directory parts of all prereqs newer than \
+target.")
+                ("(?F)" . "List of basenames of all prereqs newer than target."))))
       (cl-loop for (v . meta) in av
          do (setq v (concat "$" v))
            (add-text-properties
@@ -95,12 +113,9 @@ pattern=a.%.b, then dir/a"))))
 (defvar company-makefile--implicit
   (cl-loop for (k . arr) in
        (with-temp-buffer
-         (insert-file-contents
-          (expand-file-name "build/impvars.dat"
-                            company-makefile--dir))
-         (car (read-from-string
-               (buffer-substring-no-properties (point-min)
-                                               (point-max)))))
+         (insert-file-contents company-makefile--vars)
+         (car (read-from-string (buffer-substring-no-properties (point-min)
+                                                                (point-max)))))
      do (add-text-properties
          0 1
          (list

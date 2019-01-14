@@ -1,5 +1,5 @@
-require 'HTTParty'
-require 'Nokogiri'
+require 'httparty'
+require 'nokogiri'
 require 'openssl'
 require 'json'
 
@@ -17,8 +17,9 @@ while node = nodes.shift
   if node.name == "dt"
     key = node.text
     node = nodes.shift while node && node.name != "dd"
-    meta = node.name == "dd" ? node.text.strip.gsub("\u2018", "'").
-                                 gsub("\u2019", "'"): ""
+    meta = node.name == "dd" ? node.text.strip
+                                 .gsub("\u2018", "'")
+                                 .gsub("\u2019", "'"): ""
     uri = node.css("a")[0]["name"] rescue ""
     vars[key] = [meta, uri]
   end
