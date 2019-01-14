@@ -1,4 +1,4 @@
-;;; company-makefile.el --- company backend for makefiles -*- lexical-binding: t; -*-
+;;; company-makefile.el --- completion backend for gnu makefiles -*- lexical-binding: t; -*-
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
@@ -6,6 +6,7 @@
 ;; Package-Requires: 
 ;; Created: 25 October 2016
 ;; Version: 0.0.1
+;; Keywords: convenience, matching
 
 ;; This file is not part of GNU Emacs.
 ;;
@@ -40,19 +41,29 @@
 (defvar company-require-match)
 (defvar company-backends)
 
-(defvar company-makefile-modes '(makefile-gmake-mode))
+(defgroup company-makefile nil
+  "Completion backend for gnu makefiles."
+  :group 'convenience
+  :group 'matching)
 
-(defvar company-makefile-dynamic-complete t
+(defcustom company-makefile-modes '(makefile-gmake-mode)
+  "Modes where `company-makefile' should be active."
+  :type '(repeat :inline t (symbol :tag "mode")))
+
+(defcustom company-makefile-dynamic-complete t
   "Offer dynamic completions for macros/targets. Invalidates 
 `makefile-need-macro-pickup' and `makefile-need-target-pickup' after ':' and '='
-respectively.'")
+respectively.'"
+  :type '(choice (const :tag "off" nil)
+                 (const :tag "on" t)))
 
-(defvar company-makefile--dir)
-(defvar company-makefile--vars)
-(when load-file-name
-  (setq company-makefile--dir (file-name-directory load-file-name))
-  (setq company-makefile--vars
-        (expand-file-name "build/impvars.el" company-makefile--dir)))
+;; structure to store variable info - used in build
+(cl-defstruct (company-makefile-vars (:constructor nil)
+                                     (:constructor company-makefile-vars--create
+                                                   (&optional name meta default
+                                                              annot index type))
+                                     (:copier nil))
+  (name nil :read-only t) (meta "") (default "") (annot "") index type)
 
 ;; ------------------------------------------------------------
 ;;* Completion candidates
@@ -67,42 +78,19 @@ respectively.'")
 
 ;; uris for help docs
 (defvar company-makefile--uris
-  '((:auto
-     . "https://www.gnu.org/software/make/manual/html_node/\
-Automatic-Variables.html")
-    (:fun
+  '((:var
+     . "https://www.gnu.org/software/make/manual/html_node/Automatic-Variables.html")
+    (:function
      . "https://www.gnu.org/software/make/manual/html_node/Functions.html")
     (:implicit
-     . "https://www.gnu.org/software/make/manual/html_node/\
-Implicit-Variables.html")))
+     . "https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html")
+    (:keyword . nil)
+    (:dynamic . nil)))
 
 ;; automatic variables with meta blurb
 (defvar company-makefile--autovars
   (eval-when-compile
-    (let ((av '(("@" . "Target name")
-                ("%" . "Target member name, eg. target=foo.a(bar.o), \
-then '$%'=bar.o and '$@'=foo.a")
-                ("<" . "Name of first prerequisite")
-                ("?" . "Names of all prerequisites newer than target")
-                ("^" . "Names of all prerequisites (no duplicates)")
-                ("+" . "Like '^', but with duplicates")
-                ("|" . "Names of all order-only prerequisites")
-                ("*" . "Stem of implicit rule, eg. target=dir/a.foo.a, \
-pattern=a.%.b, then dir/a")
-                ("(@D)" . "Directory part of file name of target with \
-trailing slash removed.")
-                ("(@F)" . "Basename of target - equivalent to $(notdir $@)")
-                ("(*D)" . "Directory part of stem.")
-                ("(*F)" . "Basename part of stem.")
-                ("(%D)" . "Directory part of target archive member name.")
-                ("(%F)" . "Basename part of target archive member name.")
-                ("(<D)" . "Directory part of first prerequiste.")
-                ("(<F)" . "Basename part of first prerequiste.")
-                ("(^D)" . "List of directory parts of all prereqs.")
-                ("(^F)" . "List of basenames of all prereqs.")
-                ("(?D)" . "List of directory parts of all prereqs newer than \
-target.")
-                ("(?F)" . "List of basenames of all prereqs newer than target."))))
+    (let ((av ))
       (cl-loop for (v . meta) in av
          do (setq v (concat "$" v))
            (add-text-properties
