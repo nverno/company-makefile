@@ -29,6 +29,7 @@
 (defun make-vars-dump-data (data file)
   "Dump resulting hash table to file."
   (with-temp-buffer
+    (insert ";; -*- no-byte-compile: t -*-\n")
     (prin1 data (current-buffer))
     (write-file file)))
 

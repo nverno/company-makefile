@@ -80,11 +80,20 @@ respectively.'"
     (:keyword . nil)
     (:dynamic . nil)))
 
+(eval-and-compile
+  (defconst company-makefile-dir
+    (file-name-directory
+     (cond
+      (load-in-progress load-file-name)
+      ((and (boundp 'byte-compile-current-file) byte-compile-current-file)
+       byte-compile-current-file)
+      (:else (buffer-file-name))))))
+
 (defvar company-makefile-data
-  (when load-file-name
-    (with-temp-buffer
-      (insert-file-contents "company-makefile-data.el")
-      (car (read-from-string (buffer-string))))))
+  (with-temp-buffer
+    (insert-file-contents
+     (expand-file-name "company-makefile-data.el" company-makefile-dir))
+    (car (read-from-string (buffer-string)))))
 
 ;; dynamic completions
 (defvar-local company-makefile--dyn-vars ())
