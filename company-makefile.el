@@ -2,7 +2,7 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
-;; Last modified: <2019-01-14 15:02:15>
+;; Last modified: <2019-01-15 00:58:00>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
@@ -187,6 +187,7 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
               `(,@(assq 'function company-makefile-data)
                 ,@(assq 'implicit company-makefile-data)
                 ,@(assq 'autovar company-makefile-data)
+                ,@(assq 'dynamic company-makefile-data)
                 ,@(company-makefile--dyn-macro))
               :annotation-function 'company-makefile--annotation
               :company-location 'company-makefile--location
@@ -197,6 +198,7 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
         (list (car bnds) (cdr bnds)
               `(,@(company-makefile--dyn-macro)
                 ,@(assq 'implicit company-makefile-data)
+                ,@(assq 'dynamic company-makefile-data)
                 ,@(assq 'autovar company-makefile-data))))
        ;; targets
        ((company-makefile--target-p)
