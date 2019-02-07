@@ -2,7 +2,7 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
-;; Last modified: <2019-01-15 00:58:00>
+;; Last modified: <2019-02-07 02:37:36>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
@@ -177,9 +177,9 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
        ;; point or symbol prefixed by $, company-makefile--autovars
        ((eq (char-before (car bnds)) ?$)
         (list (car bnds) (cdr bnds) (assq 'autovar company-makefile-data)
-              :annotation-function 'company-makefile--annotation
-              :company-location 'company-makefile--location
-              :company-docsig 'company-makefile--meta))
+              :annotation-function #'company-makefile--annotation
+              :company-location #'company-makefile--location
+              :company-docsig #'company-makefile--meta))
        ;; function / local variable / implicit vars / autovars
        ((and (eq (char-before (car bnds)) ?\()
              (eq (char-before (1- (car bnds))) ?$))
@@ -189,9 +189,9 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
                 ,@(assq 'autovar company-makefile-data)
                 ,@(assq 'dynamic company-makefile-data)
                 ,@(company-makefile--dyn-macro))
-              :annotation-function 'company-makefile--annotation
-              :company-location 'company-makefile--location
-              :company-docsig 'company-makefile--meta))
+              :annotation-function #'company-makefile--annotation
+              :company-location #'company-makefile--location
+              :company-docsig #'company-makefile--meta))
        ;; ${...} - local / auto / implicit vars
        ((and (eq (char-before (car bnds)) ?{)
              (eq (char-before (1- (car bnds))) ?$))
@@ -204,27 +204,26 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
        ((company-makefile--target-p)
         (list (car bnds) (cdr bnds)
               (company-makefile--dyn-target)
-              :annotation-function 'company-makefile--annotation))
+              :annotation-function #'company-makefile--annotation))
        ;; keywords
        (t
         (list (car bnds) (cdr bnds) (assq 'keyword company-makefile-data)
-              :annotation-function 'company-makefile--annotation)))))
+              :annotation-function #'company-makefile--annotation)))))
 
 ;;;###autoload
 (defun company-makefile-init ()
   ;; when dynamically completing, rebind ":" and "=" to 
   ;; invalidate make-mode dynamic completion tables for macros/targets
   (when company-makefile-dynamic-complete
-    (eval-after-load 'makefile-mode
-      (progn
-        (define-key makefile-mode-map "=" (lambda (arg)
-                                            (interactive "p")
-                                            (setq makefile-need-macro-pickup t)
-                                            (self-insert-command arg)))
-        (define-key makefile-mode-map ":" (lambda (arg)
-                                            (interactive "p")
-                                            (setq makefile-need-target-pickup t)
-                                            (self-insert-command arg))))))
+    (with-eval-after-load 'makefile-mode
+      (define-key makefile-mode-map "=" (lambda (arg)
+                                          (interactive "p")
+                                          (setq makefile-need-macro-pickup t)
+                                          (self-insert-command arg)))
+      (define-key makefile-mode-map ":" (lambda (arg)
+                                          (interactive "p")
+                                          (setq makefile-need-target-pickup t)
+                                          (self-insert-command arg)))))
 
   ;; replace makefile completion at point function
   (remove-hook 'completion-at-point-functions 'makefile-completions-at-point 'local)
