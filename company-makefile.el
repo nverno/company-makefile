@@ -2,7 +2,7 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
-;; Last modified: <2019-02-07 02:37:36>
+;; Last modified: <2019-02-08 05:22:48>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
@@ -210,26 +210,27 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
         (list (car bnds) (cdr bnds) (assq 'keyword company-makefile-data)
               :annotation-function #'company-makefile--annotation)))))
 
+;; when dynamically completing, rebind ":" and "=" to 
+;; invalidate make-mode dynamic completion tables for macros/targets
+(when company-makefile-dynamic-complete
+  (with-eval-after-load 'makefile-mode
+    (cl-macrolet ((insert-fn (name pickup)
+                    (let ((fn-name (intern (concat "insert-" name))))
+                      `(progn
+                         (defun ,fn-name (arg)
+                           (interactive "p")
+                           (setq ,pickup t)
+                           (self-insert-command arg))))))
+      (define-key makefile-mode-map "=" (insert-fn "=" makefile-need-macro-pickup))
+      (define-key makefile-mode-map ":"
+        (insert-fn ":" makefile-need-target-pickup)))))
+
 ;;;###autoload
 (defun company-makefile-init ()
-  ;; when dynamically completing, rebind ":" and "=" to 
-  ;; invalidate make-mode dynamic completion tables for macros/targets
-  (when company-makefile-dynamic-complete
-    (with-eval-after-load 'makefile-mode
-      (define-key makefile-mode-map "=" (lambda (arg)
-                                          (interactive "p")
-                                          (setq makefile-need-macro-pickup t)
-                                          (self-insert-command arg)))
-      (define-key makefile-mode-map ":" (lambda (arg)
-                                          (interactive "p")
-                                          (setq makefile-need-target-pickup t)
-                                          (self-insert-command arg)))))
-
-  ;; replace makefile completion at point function
+  "Update `completion-at-point-functions' and `company' variables when \
+`company' is enabled."
   (remove-hook 'completion-at-point-functions 'makefile-completions-at-point 'local)
   (add-hook 'completion-at-point-functions 'company-makefile-capf nil 'local)
-
-  ;; setup company-backend
   (when (featurep 'company)
     (setq-local company-require-match 'never)
     (make-local-variable 'company-backends)
@@ -240,3 +241,7 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
 
 (provide 'company-makefile)
 ;;; company-makefile.el ends here
+
+;; Local Variables:
+;; lisp-indent-function: common-lisp-indent-function
+;; End:
