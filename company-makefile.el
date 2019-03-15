@@ -2,11 +2,10 @@
 
 ;; Author: Noah Peart <noah.v.peart@gmail.com>
 ;; Maintainer: Noah Peart <noah.v.peart@gmail.com>
-;; Last modified: <2019-02-08 05:22:48>
+;; Last modified: <2019-03-14 19:42:21>
 ;; URL: https://github.com/nverno/company-makefile
 ;; Package-Requires: 
 ;; Created: 25 October 2016
-;; Version: 0.0.1
 ;; Keywords: convenience, matching
 
 ;; This file is not part of GNU Emacs.
