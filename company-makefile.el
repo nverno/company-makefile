@@ -235,8 +235,8 @@ TYPE should be one of [macro|target] to align with `make-mode' variables."
     (make-local-variable 'company-backends)
     (cl-pushnew 'company-capf company-backends)))
 
-;;;###autoload
-(add-hook 'makefile-mode-hook 'company-makefile-init)
+;; ;;;###autoload
+;; (add-hook 'makefile-mode-hook 'company-makefile-init)
 
 (provide 'company-makefile)
 ;;; company-makefile.el ends here
